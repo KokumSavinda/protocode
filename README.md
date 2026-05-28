@@ -40,4 +40,34 @@ The skeleton gets analyzed pixel by pixel. Each pixel's neighbor count determine
 <img width="1365" height="989" alt="image" src="https://github.com/user-attachments/assets/9fcfe739-b140-499a-bdb8-493bf573386c" />
 <img width="1365" height="989" alt="image" src="https://github.com/user-attachments/assets/cf823fa8-cf78-4e20-b38d-c61e433d7637" />
 
+# The Fights
+This section documents what actually went wrong during development and how I responded to it. The pipeline in the section above looks clean in hindsight — this is what it looked like getting there.
+## Fight 1 - Thresholding
+The first major problem was patches in the thresholded image. Certain areas of the board would threshold incorrectly, reading background as wire or wire as background, because the lighting across the board was never perfectly even.
+The first attempt was simple (global) thresholding. It failed immediately under any real lighting condition: a fixed brightness cutoff can't handle a board that's brighter in one corner than another.
 
+Switched to adaptive thresholding, which computes a local brightness reference per pixel. Better, but still not right, the standard square kernel was sampling pixels in all directions equally, which meant it was being influenced by the horizontal and vertical grid lines of the whiteboard when computing the local reference for nearby wire pixels.
+
+Tried a cross-shaped kernel next, hoping it would isolate horizontal and vertical lines better. Then a circular kernel as an experiment. The circular kernel ended up working best - it samples a natural neighborhood around each pixel without any directional bias, giving the cleanest local brightness estimate for hand-drawn content on a grid background.
+## Fight 2 - Morphology and the grid
+After thresholding, the circuit lines were there, but so was the whiteboard grid and various artifacts from lighting. The grid lines were thinner than the drawn circuit lines, which gave something to work with morphologically.
+
+The sequencing of opening and closing took some working out. The intuitive order (close first to fill gaps, open to remove noise) actually disconnected the circuit lines. The correct order turned out to be open first (to connect small gaps in drawn lines) then close (to remove the thinner grid lines and artifacts). Getting that order wrong broke the circuit topology entirely.
+## Fight 3 - Getting to a clean skeleton
+This was the longest fight. The goal was a single-pixel-wide wire path, a skeleton the graph traversal could actually walk. The problem was webbing: instead of clean single paths, skeletonization on raw morphological output produced branching tangles of 1-pixel lines at every imperfection in the drawn stroke.
+Tried 
+- Gaussian blur iterations
+- blur, threshold, repeat
+
+to smooth strokes before skeletonization. The lines would disappear or merge if the kernel was too large, break apart if it was too small. Tried multiple skeletonization approaches: 
+- OpenCV's iterative erosion method
+- skimage.skeletonize
+- skimage.thin
+- finally skimage.medial_axis.
+
+Tried a separate heal_skeleton function to bridge gaps after the fact.
+Median blur turned out to be the right smoothing step, it preserves edge sharpness better than Gaussian while still rounding off the jagged stroke edges that cause webbing. Combined with the right morphological preparation, this gave a clean enough skeleton for the feature extraction to work.
+## The thing I'm quietly proud of
+After skeletonization, there were still false junctions and endpoints: artifacts of imperfect skeletonization rather than real circuit topology. I designed a cleanup filter that identifies and removes these based on proximity rules: a junction too close to an endpoint is a bend not a junction, two endpoints too close together are a continuous line not two terminals.
+
+This wasn't from a textbook. It came from staring at the output long enough to understand exactly how the skeleton was lying to me.
