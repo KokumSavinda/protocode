@@ -71,3 +71,41 @@ Median blur turned out to be the right smoothing step, it preserves edge sharpne
 After skeletonization, there were still false junctions and endpoints: artifacts of imperfect skeletonization rather than real circuit topology. I designed a cleanup filter that identifies and removes these based on proximity rules: a junction too close to an endpoint is a bend not a junction, two endpoints too close together are a continuous line not two terminals.
 
 This wasn't from a textbook. It came from staring at the output long enough to understand exactly how the skeleton was lying to me.
+
+# Current State
+This is a work in progress.
+
+The pipeline was developed and tested primarily on iPhone images. Even under those conditions it produces a correct output roughly 4 out of 10 times. On lower quality phone cameras the success rate drops further. The most common failure point is thresholding, if the lighting conditions are outside what the adaptive threshold can handle, everything downstream breaks.
+
+The mobile app side is essentially untouched. Right now this is a Python pipeline that takes an image as input. The app integration, the UI, the truth table output, none of that exists yet.
+
+**What I'm working on**
+
+The immediate goal is making the pipeline robust enough to handle real world inputs reliably. different lighting conditions, different cameras, different drawing styles. A system that works 4 out of 10 times is a proof of concept. The goal is something a kid can actually use without it feeling broken.
+
+## How to Run
+There is no script yet, the pipeline lives in a Jupyter notebook.
+
+**Dependencies**
+```
+opencv-python
+numpy
+matplotlib
+scikit-image
+```
+**Install them with:**
+```
+pip install opencv-python numpy matplotlib scikit-image
+```
+**Running the pipeline**
+
+1. Open ProtoCode2_1.ipynb in Jupyter
+2. Run all cells in order
+3. When prompted, enter the path to your image
+
+The notebook will display intermediate outputs at each stage so you can see exactly where it succeeds or fails.
+Image requirements
+
+- The whiteboard must be fully visible in the frame
+- All four corner ArUco markers must be visible
+- Works best with decent lighting and minimal glare on the whiteboard
